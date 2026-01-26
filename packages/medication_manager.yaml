@@ -1,3 +1,4 @@
+blueprint:
 input_select:
   med_auswahl:
     name: Medikament auswählen
