@@ -1,0 +1,101 @@
+blueprint:
+  name: Medikamenten Manager (Multi-Med, iOS, Alexa, NFC)
+  description: >
+    Medikamenten-Erinnerung mit Auswahl, Bestand, Snooze, Rezept-Reminder und NFC-Auffüllung.
+  domain: automation
+
+  input:
+    reminder_time:
+      name: Einnahmezeit
+      selector:
+        time:
+
+    notify_ios:
+      name: iOS Notify Service
+      selector:
+        text:
+
+    notify_alexa:
+      name: Alexa Notify Service (optional)
+      default: ""
+      selector:
+        text:
+
+    snooze_minutes:
+      name: Später erinnern (Minuten)
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 5
+
+    nfc_tag:
+      name: NFC Tag zum Auffüllen (optional)
+      default: ""
+      selector:
+        text:
+
+    refill_amount:
+      name: Packungsgröße für Auffüllung
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 500
+          step: 1
+
+trigger:
+  - platform: time
+    at: !input reminder_time
+  - platform: tag
+    tag_id: !input nfc_tag
+
+variables:
+  med: "{{ states('input_select.med_auswahl') | lower }}"
+  zeit: "{{ states('input_select.med_einnahmezeit') | lower }}"
+  dosis: "input_number.med_{{ med }}_dosis_{{ zeit }}"
+  bestand: "input_number.med_{{ med }}_bestand"
+
+action:
+  - choose:
+      - conditions: "{{ trigger.platform == 'tag' }}"
+        sequence:
+          - service: input_number.set_value
+            data:
+              entity_id: "{{ bestand }}"
+              value: >
+                {{ states(bestand) | float + !input refill_amount | float }}
+          - service: !input notify_ios
+            data:
+              title: "💊 {{ states('input_select.med_auswahl') }} aufgefüllt"
+              message: "Neuer Bestand: {{ states(bestand) }}"
+          - choose:
+              - conditions: "{{ !input notify_alexa != '' }}"
+                sequence:
+                  - service: !input notify_alexa
+                    data:
+                      message: "{{ states('input_select.med_auswahl') }} wurde aufgefüllt."
+      - conditions: "{{ trigger.platform == 'time' }}"
+        sequence:
+          - service: !input notify_ios
+            data:
+              title: "💊 {{ states('input_select.med_auswahl') }}"
+              message: >
+                Einnahme: {{ states('input_select.med_einnahmezeit') }}
+                Dosis: {{ states(dosis) }}
+                Bestand: {{ states(bestand) }}
+              data:
+                actions:
+                  - action: TAKEN
+                    title: "✅ Genommen"
+                  - action: HALF
+                    title: "➗ Halbe"
+                  - action: SNOOZE
+                    title: "⏰ Später"
+          - choose:
+              - conditions: "{{ !input notify_alexa != '' }}"
+                sequence:
+                  - service: !input notify_alexa
+                    data:
+                      message: "Zeit für dein Medikament {{ states('input_select.med_auswahl') }}."
