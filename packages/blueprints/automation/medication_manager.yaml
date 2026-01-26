@@ -1,0 +1,56 @@
+blueprint:
+  name: Medikamenten Manager (Multi-Med, iOS, Alexa, Assist)
+  domain: automation
+
+  input:
+    reminder_time:
+      name: Einnahmezeit
+      selector:
+        time:
+
+    notify_ios:
+      name: iOS Notify Service
+      selector:
+        text:
+
+    notify_alexa:
+      name: Alexa Notify Service (optional)
+      default: ""
+      selector:
+        text:
+
+    snooze_minutes:
+      name: Später erinnern (Minuten)
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 5
+
+trigger:
+  - platform: time
+    at: !input reminder_time
+
+variables:
+  med: "{{ states('input_select.med_auswahl') | lower }}"
+  zeit: "{{ states('input_select.med_einnahmezeit') | lower }}"
+  dosis: "input_number.med_{{ med }}_dosis_{{ zeit }}"
+  bestand: "input_number.med_{{ med }}_bestand"
+
+action:
+  - service: !input notify_ios
+    data:
+      title: "💊 {{ states('input_select.med_auswahl') }}"
+      message: >
+        Einnahme: {{ states('input_select.med_einnahmezeit') }}
+        Dosis: {{ states(dosis) }}
+        Bestand: {{ states(bestand) }}
+      data:
+        actions:
+          - action: TAKEN
+            title: "✅ Genommen"
+          - action: HALF
+            title: "➗ Halbe"
+          - action: SNOOZE
+            title: "⏰ Später"
