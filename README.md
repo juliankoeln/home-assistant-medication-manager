@@ -1,11 +1,16 @@
-# home-assistant-medication-manager
-Medikamente Erinnerung 
-# 💊 Home Assistant Medication Manager
+# Home Assistant Medication Manager
 
-Medikamenten-Erinnerung für Home Assistant:
-- mehrere Medikamente
-- morgens / abends
+- Multi-Medikamenten Blueprint
+- 2x täglich Einnahme
 - iOS Push mit Buttons
-- Alexa & HA Assist
+- Alexa & Home Assistant Assist
+- NFC-Tag Auffüllung
+- Bestands- und Rezept-Reminder
 
-Installation siehe Blueprint & Package.
+## Installation
+
+1. Ordner `packages` in HA aktivieren (`configuration.yaml`):
+
+```yaml
+homeassistant:
+  packages: !include_dir_named packages
