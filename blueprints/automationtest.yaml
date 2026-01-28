@@ -1,0 +1,99 @@
+blueprint:
+  name: 💊 Medikamenten-Erinnerung (stabil mit Push)
+  description: Erinnerung mit Push, Bestand, Dosierung und Warnung
+  domain: automation
+
+  input:
+    med_name:
+      name: Medikamentenname
+      selector:
+        text:
+
+    med_counter:
+      name: Bestandszähler
+      selector:
+        entity:
+          domain: counter
+
+    dosis:
+      name: Dosierung pro Einnahme
+      selector:
+        number:
+          min: 1
+          max: 10
+
+    warnwert:
+      name: Warnschwelle
+      selector:
+        number:
+          min: 0
+          max: 50
+
+    erinnerungszeit:
+      name: Einnahmezeit
+      selector:
+        time:
+
+    notify_service:
+      name: Notify-Service (z. B. notify.mobile_app_julians_robotoro)
+      selector:
+        text:
+
+trigger:
+  - platform: time
+    at: !input erinnerungszeit
+
+mode: restart
+
+action:
+  # Push mit Buttons
+  - service: !input notify_service
+    data:
+      title: "💊 Medikamenten-Erinnerung"
+      message: !input med_name
+      data:
+        actions:
+          - action: taken
+            title: "Eingenommen"
+          - action: later
+            title: "Später erinnern"
+
+  # Warten auf Button
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+
+  # Button-Auswertung
+  - choose:
+      # Eingenommen → Counter reduzieren
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger.event.data.action == 'taken' }}"
+        sequence:
+          - repeat:
+              count: !input dosis
+              sequence:
+                - service: counter.decrement
+                  target:
+                    entity_id: !input med_counter
+
+      # Später erinnern → erneute Push-Nachricht
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger.event.data.action == 'later' }}"
+        sequence:
+          - delay: "00:15:00"
+          - service: !input notify_service
+            data:
+              title: "💊 Erinnerung"
+              message: !input med_name
+
+  # Warnung bei niedrigem Bestand
+  - condition: numeric_state
+    entity_id: !input med_counter
+    below: !input warnwert
+
+  - service: !input notify_service
+    data:
+      title: "⚠️ Medikament fast leer"
+      message: "Bitte Bestand prüfen"
