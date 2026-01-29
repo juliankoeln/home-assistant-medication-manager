@@ -1,6 +1,6 @@
 blueprint:
   name: 💊 Medikamenten-Erinnerung (stabil mit Push)
-  description: Erinnerung mit Push, Bestand, Dosierung und Warnung
+  description: Erinnerung zur Einnahme, Counter, Warnung und Push auf das Handy
   domain: automation
 
   input:
@@ -39,6 +39,13 @@ blueprint:
       selector:
         text:
 
+    dashboard_url:
+      name: Dashboard-Pfad (für Push clickAction)
+      description: "/lovelace/0 oder /lovelace/medikamente"
+      default: "/lovelace/0"
+      selector:
+        text:
+
 trigger:
   - platform: time
     at: !input erinnerungszeit
@@ -46,22 +53,21 @@ trigger:
 mode: restart
 
 action:
-  # Push mit Buttons
-- service: !input notify_service
-  data:
-    title: "💊 Medikamenten-Erinnerung"
-    message: !input med_name
+  # Push mit clickAction auf Dashboard
+  - service: !input notify_service
     data:
-      clickAction: "app://lovelace/Testboard"
+      title: "💊 Erinnerung"
+      message: !input med_name
+      data:
+        clickAction: !input dashboard_url
 
-  # Warten auf Button
+  # Warten auf Button-Klick auf Push (wenn Buttons unterstützt)
   - wait_for_trigger:
       - platform: event
         event_type: mobile_app_notification_action
 
-  # Button-Auswertung
+  # Buttons auswerten (optional, Dashboard-Buttons empfohlen)
   - choose:
-      # Eingenommen → Counter reduzieren
       - conditions:
           - condition: template
             value_template: "{{ wait.trigger.event.data.action == 'taken' }}"
@@ -73,7 +79,6 @@ action:
                   target:
                     entity_id: !input med_counter
 
-      # Später erinnern → erneute Push-Nachricht
       - conditions:
           - condition: template
             value_template: "{{ wait.trigger.event.data.action == 'later' }}"
@@ -83,13 +88,16 @@ action:
             data:
               title: "💊 Erinnerung"
               message: !input med_name
+              data:
+                clickAction: !input dashboard_url
 
-  # Warnung bei niedrigem Bestand
+  # Warnung bei niedrigem Bestand (funktioniert auch separat als eigene Automation)
   - condition: numeric_state
     entity_id: !input med_counter
     below: !input warnwert
-
   - service: !input notify_service
     data:
       title: "⚠️ Medikament fast leer"
       message: "Bitte Bestand prüfen"
+      data:
+        clickAction: !input dashboard_url
