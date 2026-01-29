@@ -53,18 +53,24 @@ trigger:
 mode: restart
 
 action:
-# Push-Erinnerung
-- service: !input notify_service
-  data:
-    title: "💊 Erinnerung"
-    message: !input med_name
+action:
+  # Push-Erinnerung
+  - service: !input notify_service
+    data:
+      title: "💊 Erinnerung"
+      message: !input med_name
 
-# Navigation zum Dashboard
-- service: mobile_app.navigate
-  target:
-    device_id: !input notify_device
-  data:
-    path: !input dashboard_url
+  # Dashboard öffnen über mobile_app.navigate
+  - service: mobile_app.navigate
+    target:
+      device_id: !input notify_device
+    data:
+      path: !input dashboard_url
+
+  # Warten auf Button (falls App Buttons unterstützt)
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
 
 
   # Warten auf Button-Klick auf Push (wenn Buttons unterstützt)
