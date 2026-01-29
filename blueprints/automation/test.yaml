@@ -52,7 +52,7 @@ action:
     title: "💊 Medikamenten-Erinnerung"
     message: !input med_name
     data:
-      clickAction: "app://lovelace/0"
+      clickAction: "app://lovelace/Testboard"
 
   # Warten auf Button
   - wait_for_trigger:
