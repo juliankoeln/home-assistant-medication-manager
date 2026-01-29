@@ -1,0 +1,109 @@
+blueprint:
+  name: 💊 Medikamenten-Erinnerung (stabil mit Push)
+  description: Erinnerung zur Einnahme, Counter, Warnung und Push auf das Handy
+  domain: automation
+
+  input:
+    med_name:
+      name: Medikamentenname
+      selector:
+        text:
+
+    med_counter:
+      name: Bestandszähler
+      selector:
+        entity:
+          domain: counter
+
+    dosis:
+      name: Dosierung pro Einnahme
+      selector:
+        number:
+          min: 1
+          max: 10
+
+    warnwert:
+      name: Warnschwelle
+      selector:
+        number:
+          min: 0
+          max: 50
+
+    erinnerungszeit:
+      name: Einnahmezeit
+      selector:
+        time:
+
+    notify_service:
+      name: Notify-Service (z. B. notify.mobile_app_julians_robotoro)
+      selector:
+        text:
+
+    dashboard_url:
+      name: Dashboard-Pfad (für Push clickAction)
+      description: "/lovelace/0 oder /lovelace/medikamente"
+      default: "/lovelace/0"
+      selector:
+        text:
+
+trigger:
+  - platform: time
+    at: !input erinnerungszeit
+
+mode: restart
+
+action:
+# Push-Erinnerung
+- service: !input notify_service
+  data:
+    title: "💊 Erinnerung"
+    message: !input med_name
+
+# Navigation zum Dashboard
+- service: mobile_app.navigate
+  target:
+    device_id: !input notify_device
+  data:
+    path: !input dashboard_url
+
+
+  # Warten auf Button-Klick auf Push (wenn Buttons unterstützt)
+  - wait_for_trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+
+  # Buttons auswerten (optional, Dashboard-Buttons empfohlen)
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger.event.data.action == 'taken' }}"
+        sequence:
+          - repeat:
+              count: !input dosis
+              sequence:
+                - service: counter.decrement
+                  target:
+                    entity_id: !input med_counter
+
+      - conditions:
+          - condition: template
+            value_template: "{{ wait.trigger.event.data.action == 'later' }}"
+        sequence:
+          - delay: "00:15:00"
+          - service: !input notify_service
+            data:
+              title: "💊 Erinnerung"
+              message: !input med_name
+              data:
+                clickAction: !input dashboard_url
+
+  # Warnung bei niedrigem Bestand (funktioniert auch separat als eigene Automation)
+  - condition: numeric_state
+    entity_id: !input med_counter
+    below: !input warnwert
+  - service: !input notify_service
+    data:
+      title: "⚠️ Medikament fast leer"
+      message: "Bitte Bestand prüfen"
+      data:
+        clickAction: !input dashboard_url
